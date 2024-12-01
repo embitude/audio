@@ -1,0 +1,258 @@
+Platform Drivers related APIs
+-----------------------------
+include/linux/platform_device.h
+
+struct platform_driver {
+        int (*probe)(struct platform_device *);
+        int (*remove)(struct platform_device *);
+        void (*shutdown)(struct platform_device *);
+        int (*suspend)(struct platform_device *, pm_message_t state);
+        int (*resume)(struct platform_device *);
+        struct device_driver driver;
+        const struct platform_device_id *id_table;
+        bool prevent_deferred_probe;
+}; 
+
+int platform_driver_register(struct platform_driver *pl_driver);
+void platform_driver_unregister(struct platform_driver *);
+
+int platform_device_register(struct platform_device *)
+
+struct platform_device *platform_device_register_simple(
+                const char *name, int id,
+                const struct resource *res, unsigned int num)
+void platform_device_unregister(struct platform_device *);
+
+
+
+ALSA Driver APIs
+----------------
+include/sound/core.h
+int snd_card_new(struct device *parent, int idx, const char *xid,
+         struct module *module, int extra_size,
+         struct snd_card **card_ret)
+int snd_card_register(struct snd_card *);
+int snd_card_free(struct snd_card *card)
+
+include/sound/pcm.h
+int snd_pcm_new(struct snd_card *card, const char *id, int device,
+        int playback_count, int capture_count,
+        struct snd_pcm **rpcm)
+void snd_pcm_set_ops(struct snd_pcm * pcm, int direction,
+             const struct snd_pcm_ops *ops);
+struct snd_pcm_ops {
+    int (*open)(struct snd_pcm_substream *substream);
+    int (*close)(struct snd_pcm_substream *substream);
+    int (*ioctl)(struct snd_pcm_substream * substream,
+             unsigned int cmd, void *arg);
+    int (*hw_params)(struct snd_pcm_substream *substream,
+             struct snd_pcm_hw_params *params);
+    int (*hw_free)(struct snd_pcm_substream *substream);
+    int (*prepare)(struct snd_pcm_substream *substream);
+    int (*trigger)(struct snd_pcm_substream *substream, int cmd);
+    snd_pcm_uframes_t (*pointer)(struct snd_pcm_substream *substream);
+    int (*get_time_info)(struct snd_pcm_substream *substream,
+            struct timespec *system_ts, struct timespec *audio_ts,
+            struct snd_pcm_audio_tstamp_config *audio_tstamp_config,
+            struct snd_pcm_audio_tstamp_report *audio_tstamp_report);
+    int (*fill_silence)(struct snd_pcm_substream *substream, int channel,
+                unsigned long pos, unsigned long bytes);
+    int (*copy_user)(struct snd_pcm_substream *substream, int channel,
+             unsigned long pos, void __user *buf,
+             unsigned long bytes);
+    int (*copy_kernel)(struct snd_pcm_substream *substream, int channel,
+               unsigned long pos, void *buf, unsigned long bytes);
+    struct page *(*page)(struct snd_pcm_substream *substream,
+                 unsigned long offset);
+    int (*mmap)(struct snd_pcm_substream *substream, struct vm_area_struct *vma);
+    int (*ack)(struct snd_pcm_substream *substream);
+};
+
+Allocate the pages
+int snd_pcm_lib_preallocate_pages_for_all(struct snd_pcm *pcm,
+                      int type, void *data,
+                      size_t size, size_t max);
+
+int snd_pcm_lib_malloc_pages(struct snd_pcm_substream *substream, size_t size);
+int snd_pcm_lib_free_pages(struct snd_pcm_substream *substream);
+
+Period Elapsed
+--------------
+void snd_pcm_period_elapsed(struct snd_pcm_substream *substream);
+
+Frames <-> bytes conversion
+---------------------------
+ssize_t frames_to_bytes(struct snd_pcm_runtime *runtime, snd_pcm_sframes_t size)
+snd_pcm_sframes_t bytes_to_frames(struct snd_pcm_runtime *runtime, ssize_t size)
+
+Timer APIs
+----------
+#include <linux/timer.h>
+timer_setup(struct timer_list *, callback, flags);
+int mod_timer(struct timer_list *timer, unsigned long expires);
+int del_timer(struct timer_list *timer)
+ASoC Driver Related
+-------------------
+#include <linux/of.h>
+struct device_node *of_parse_phandle(const struct device_node *np, const char *phandle_name, int index)
+int snd_soc_of_parse_card_name(struct snd_soc_card *card,
+                               const char *propname)
+include/sound/soc.h
+struct snd_soc_dai_link {
+        /* config - must be set by machine driver */
+        const char *name;
+        const char *stream_name;
+        const char *cpu_name;
+        const struct device_node *cpu_of_node;
+        const char *cpu_dai_name;
+        const char *codec_name;
+        const struct device_node *codec_of_node;
+        const char *codec_dai_name;
+        const char *platform_name;
+        const struct device_node *platform_of_node;
+
+        const struct snd_soc_pcm_stream *params;
+
+        unsigned int dai_fmt;
+
+        /* Keep DAI active over suspend */
+        unsigned int ignore_suspend:1;
+
+        /* Symmetry requirements */
+        unsigned int symmetric_rates:1;
+
+        unsigned int no_pcm:1;
+
+        /* codec/machine specific init - e.g. add machine controls */
+        int (*init)(struct snd_soc_pcm_runtime *rtd);
+
+        /* machine stream operations */
+        struct snd_soc_ops *ops;
+        struct snd_soc_compr_ops *compr_ops;
+};
+include/sound/soc-dai.h
+#define SND_SOC_DAIFMT_I2S              1 /* I2S mode */
+#define SND_SOC_DAIFMT_DSP_A            4 /* L data MSB after FRM LRC */
+#define SND_SOC_DAIFMT_DSP_B            5 /* L data MSB during FRM LRC */
+#define SND_SOC_DAIFMT_AC97             6 /* AC97 */
+#define SND_SOC_DAIFMT_PDM              7 /* Pulse density modulation */
+#define SND_SOC_DAIFMT_NB_NF            (1 << 8) /* normal bit clock + frame */
+#define SND_SOC_DAIFMT_NB_IF            (2 << 8) /* normal BCLK + inv FRM */
+#define SND_SOC_DAIFMT_IB_NF            (3 << 8) /* invert BCLK + nor FRM */
+#define SND_SOC_DAIFMT_IB_IF            (4 << 8) /* invert BCLK + FRM */
+#define SND_SOC_DAIFMT_CBM_CFM          (1 << 12) /* codec clk & FRM master */
+#define SND_SOC_DAIFMT_CBS_CFM          (2 << 12) /* codec clk slave & FRM master */
+#define SND_SOC_DAIFMT_CBM_CFS          (3 << 12) /* codec clk master & frame slave */
+#define SND_SOC_DAIFMT_CBS_CFS          (4 << 12) /* codec clk & FRM slave */
+
+int snd_soc_register_card(struct snd_soc_card *card)
+int snd_soc_unregister_card(struct snd_soc_card *card)
+
+include/sound/soc-dai.h
+struct snd_soc_dai_driver {
+        /* DAI description */
+        const char *name;
+        unsigned int id;
+        int ac97_control;
+        unsigned int base;
+
+        /* DAI driver callbacks */
+        int (*probe)(struct snd_soc_dai *dai);
+        int (*remove)(struct snd_soc_dai *dai);
+        int (*suspend)(struct snd_soc_dai *dai);
+        int (*resume)(struct snd_soc_dai *dai);
+        /* compress dai */
+        bool compress_dai; 
+
+        /* ops */
+        const struct snd_soc_dai_ops *ops;
+
+        /* DAI capabilities */
+        struct snd_soc_pcm_stream capture;
+        struct snd_soc_pcm_stream playback;
+        unsigned int symmetric_rates:1;
+
+        /* probe ordering - for components with runtime dependencies */
+        int probe_order;
+        int remove_order;
+};
+
+include/sound/soc.h
+/* SoC PCM stream information */
+struct snd_soc_pcm_stream {
+        const char *stream_name;
+        u64 formats;                    /* SNDRV_PCM_FMTBIT_* */
+        unsigned int rates;             /* SNDRV_PCM_RATE_* */
+        unsigned int rate_min;          /* min rate */
+        unsigned int rate_max;          /* max rate */
+        unsigned int channels_min;      /* min channels */
+        unsigned int channels_max;      /* max channels */
+        unsigned int sig_bits;          /* number of bits of content */
+};
+
+include/sound/pcm.h
+
+#define SNDRV_PCM_RATE_8000_44100       (SNDRV_PCM_RATE_8000|SNDRV_PCM_RATE_11025|\
+                                         SNDRV_PCM_RATE_16000|SNDRV_PCM_RATE_22050|\
+                                         SNDRV_PCM_RATE_32000|SNDRV_PCM_RATE_44100)
+#define SNDRV_PCM_RATE_8000_48000       (SNDRV_PCM_RATE_8000_44100|SNDRV_PCM_RATE_48000)
+#define SNDRV_PCM_RATE_8000_96000       (SNDRV_PCM_RATE_8000_48000|SNDRV_PCM_RATE_64000|\
+                                         SNDRV_PCM_RATE_88200|SNDRV_PCM_RATE_96000)
+#define SNDRV_PCM_RATE_8000_192000      (SNDRV_PCM_RATE_8000_96000|SNDRV_PCM_RATE_176400|\
+                                         SNDRV_PCM_RATE_192000)
+
+
+define SNDRV_PCM_FMTBIT_S8             _SNDRV_PCM_FMTBIT(S8)
+#define SNDRV_PCM_FMTBIT_U8             _SNDRV_PCM_FMTBIT(U8)
+#define SNDRV_PCM_FMTBIT_S16_LE         _SNDRV_PCM_FMTBIT(S16_LE)
+#define SNDRV_PCM_FMTBIT_S16_BE         _SNDRV_PCM_FMTBIT(S16_BE)
+#define SNDRV_PCM_FMTBIT_U16_LE         _SNDRV_PCM_FMTBIT(U16_LE)
+#define SNDRV_PCM_FMTBIT_U16_BE         _SNDRV_PCM_FMTBIT(U16_BE)
+#define SNDRV_PCM_FMTBIT_S24_LE         _SNDRV_PCM_FMTBIT(S24_LE)
+#define SNDRV_PCM_FMTBIT_S24_BE 
+SNDRV_PCM_FMTBIT_S32_LE
+
+sound/soc/soc-devres.c
+
+int devm_snd_soc_register_component(struct device *dev,
+    const struct snd_soc_component_driver *cmpnt_drv,
+    struct snd_soc_dai_driver *dai_drv, int num_dai)
+
+sound/soc/soc-core.c
+int snd_soc_dai_set_sysclk(struct snd_soc_dai *dai, int clk_id, unsigned int freq, int dir)
+
+int snd_soc_dai_set_clkdiv(struct snd_soc_dai *dai,
+        int div_id, int div)
+
+#define SND_SOC_CLOCK_IN                0
+#define SND_SOC_CLOCK_OUT               1
+int snd_soc_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+
+int of_get_named_gpio(struct device_node *np,
+                        const char *propname, int index)
+void gpio_set_value(unsigned int gpio, int value)
+
+Regmap Interface
+----------------
+include/linux/regmap.h
+struct regmap *devm_regmap_init_i2c(struct i2c_client *, struct regmap config *)
+
+Kcontrols
+---------
+int snd_soc_add_component_controls(struct snd_soc_component *component,
+        const struct snd_kcontrol_new *controls, unsigned int num_controls)
+
+DAPM
+----
+SND_SOC_DAPM_DAC(wname, stname, wreg, wshift, winvert)
+SND_SOC_DAPM_PGA(wname, wreg, wshift, winvert, wcontrols, wncontrols)
+SND_SOC_DAPM_MIXER(wname, wreg, wshift, winvert,wcontrols, wncontrols)
+
+SND_SOC_DAPM_HP(wname, wevent)
+SND_SOC_DAPM_OUTPUT(wname)
+
+int snd_soc_dapm_new_controls(struct snd_soc_dapm_context *dapm,
+	const struct snd_soc_dapm_widget *widget,
+	int num)
+int snd_soc_dapm_add_routes(struct snd_soc_dapm_context *dapm,
+			    const struct snd_soc_dapm_route *route, int num)
